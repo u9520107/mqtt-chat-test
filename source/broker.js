@@ -42,32 +42,60 @@ server.on('ready', () => {
 
 server.on('published', (packet, client) => {
   if(client) {
-    console.log(packet, client.username);
 
+    let topic = packet.topic;
+    let payload = JSON.parse(packet.payload.toString());
+
+    let action = topic.split('/').pop();
+    let merchant = 'merchant';
+    let shopper = topic.split('/')[2];
+
+    //let data = {
+    //  id: merchant,
+    //  chats: {}
+    //};
+    //data.chats[shopper] = {};
+
+    //if(action === 'msg') {
+    //  payload.read = false;
+    //  payload.sent = true;
+    //  data.chats[shopper][payload.id] = payload;
+
+    //  rdb.branch(
+    //    rdb.db('chat_server').table('chats').get(merchant),
+    //    rdb.db('chat_server').table('chats').update(data),
+    //    rdb.db('chat_server').table('chats').insert(data)
+    //  ).run();
+
+    //} else if(action === 'ack') {
+
+    //  payload.id.forEach(id => {
+    //    data.chats[shopper][id] = {
+    //      read: true
+    //    };
+    //  })
+    //  rdb.db('chat_server').table('chats').get(merchant).update(data).run();
+    //}
+
+    if(action === 'msg') {
+      payload.read = false;
+      payload.sent = true;
+      payload.merchant = merchant;
+      payload.shopper = shopper;
+
+      rdb.db('chat_server').table('msgs').insert(payload).run();
+
+    } else if(action === 'ack') {
+
+      rdb.db('chat_server').table('msgs').getAll(...payload.id).update({
+        read: true
+      }).run();
+    }
 
   }
 });
 
 
-//setInterval(() => {
-//  server.publish({
-//    topic: 'chat/merchant/' + uuid.v4(),
-//    qos: 1,
-//    payload: 'test'
-//  });
-//}, 1000);
-
-//merchant => shopper : /chat/merchant/shopper/msg
-//payload: {
-//  sender: 'merchant',
-//  msg: 'msg'
-//};
-//
-//  /chat/merchant/shopper/ack
-//  payload: {
-//    sender: 'shopper',
-//    msgId: 'msgId'
-//  }
 
 
 const broker = {

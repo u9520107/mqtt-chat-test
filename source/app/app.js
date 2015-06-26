@@ -4,6 +4,7 @@ import Component from 'meepworks/component';
 import mqtt from 'mqtt';
 import 'normalize.css/normalize.css!';
 import uuid from 'uuid';
+import fetch from 'node-fetch';
 
 
 export default class App extends Application {
@@ -110,6 +111,37 @@ class Merchant extends Component {
     }
   }
   componentDidMount() {
+    this.loadHistory();
+    this.connect();
+  }
+  async loadHistory() {
+    let res = await( await fetch('//localhost:13382/api/chat-history/merchant')).json();
+    if(Array.isArray(res.data)) {
+      res.data.forEach(m => {
+        if(!this.state.chats[m.shopper]) {
+          this.state.chats[m.shopper] = [];
+        }
+        if(!this.state.counts[m.shopper]) {
+          this.state.counts[m.shopper] = 0;
+        }
+        this.state.chats[m.shopper].push(m);
+        this.state.map[m.id] = m;
+        if(!m.read) {
+          this.state.counts[m.shopper]++;
+        }
+      });
+      for(let s in this.state.chats) {
+        this.state.chats[s].sort(sortChat);
+      }
+
+      this.setState({
+        chats: this.state.chats,
+        counts: this.state.counts,
+        map: this.state.map
+      });
+    }
+  }
+  connect() {
     let client = mqtt.connect({
       port: 3000,
       keepalive: 60,
@@ -184,9 +216,6 @@ class Merchant extends Component {
       }
     });
 
-    //client.on('message', (topic, payload) => {
-    //  console.log(topic, payload.toString());
-    //});
     this.setState({
       client
     });
@@ -353,7 +382,22 @@ class Shopper extends Component {
     };
   }
   componentDidMount() {
+    this.loadHistory();
     this.connect();
+  }
+  async loadHistory() {
+    let res = await (await fetch(`//localhost:13382/api/chat-history/merchant/${this.props.id}`)).json();
+    if(Array.isArray(res.data)) {
+      res.data.forEach(m => {
+        this.state.msgs.push(m);
+        this.state.map[m.id] = m;
+      });
+      this.state.msgs.sort(sortChat);
+      this.setState({
+        msgs: this.state.msgs,
+        map: this.state.map
+      });
+    }
   }
   connect() {
     let client = mqtt.connect({
@@ -372,7 +416,7 @@ class Shopper extends Component {
       let action = topic.split('/').pop();
       switch(action) {
         case 'msg':
-          if(payload.sender === this.props.id) {
+        if(payload.sender === this.props.id) {
             if(!this.state.map[payload.id]) {
               //if the same user sends message from a different client
               this.state.msgs.push(payload);
@@ -403,7 +447,7 @@ class Shopper extends Component {
           break;
           case 'ack':
             let changed = false;
-            if(payload.sender !== this.props.id) {
+          if(payload.sender !== this.props.id) {
               payload.id.forEach(id => {
                 if(!this.state.map[id].read) {
                   this.state.map[id].read = true;
@@ -592,3 +636,10 @@ class AddStore extends Component {
     );
   }
 }
+
+function sortChat(a, b) {
+  if(a.timestamp === b.timestamp) {
+    return 0;
+  }
+  return a.timestamp > b.timestamp ? 1: -1;
+};

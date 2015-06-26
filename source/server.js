@@ -34,7 +34,7 @@ server.use(mount('/build', serve(path.resolve(__dirname, '../build'), {
 server.use(mount('/bundle', serve(path.resolve(__dirname, '../bundle'), {
 })));
 
-//server.use(mount('/api', api.router()));
+server.use(mount('/api', api.routes()));
 
 server.use(function*(next) {
   console.log(this.req.url);
